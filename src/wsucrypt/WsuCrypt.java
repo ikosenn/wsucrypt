@@ -18,9 +18,9 @@ public class WsuCrypt {
 	private final int blockSize = 64;
 	private final int hexSize = 4;
 	private ArrayList<String> blocks;
-	public final static String keyFile = "src/wsucrypt/assets/key.txt";
-	public final static String pTextFile = "src/wsucrypt/assets/plaintext.txt";
-	public final static String cTextFile = "src/wsucrypt/assets/ciphertext.txt";
+	public final static String keyFile = "key.txt";
+	public final static String pTextFile = "plaintext.txt";
+	public final static String cTextFile = "ciphertext.txt";
 	private final static String ftable[][] = {
 		{"a3", "d7", "09", "83", "f8", "48", "f6", "f4", "b3", "21", "15", "78", "99", "b1", "af", "f9"}, 
 		{"e7", "2d", "4d", "8a", "ce", "4c", "ca", "2e", "52", "95", "d9", "1e", "4e", "38", "44", "28"}, 
