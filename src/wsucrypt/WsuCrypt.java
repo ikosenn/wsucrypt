@@ -438,7 +438,7 @@ public class WsuCrypt {
 			String cipherText = WsuCrypt.readFileContents(WsuCrypt.cTextFile);
 			cryptoObj.getBlock(cipherText);
 			cryptoObj.decrypt();
-			WsuCrypt.writeFileContents(cryptoObj.blocks, WsuCrypt.pTextFile, false);
+			WsuCrypt.writeFileContents(cryptoObj.blocks, WsuCrypt.pTextFile, true);
 		}
 		
 	}

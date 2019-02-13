@@ -1,1 +1,0 @@
-This is a simple test file to use to test for the encryption and decryption of the algorithm.
