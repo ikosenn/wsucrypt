@@ -1,7 +1,9 @@
 package wsucrypt;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
@@ -45,10 +47,40 @@ public class WsuCrypt {
 	 * @param len. How long the string should be.
 	 */
 	private static String zFill(String s, int len) {
-		for (int i = 0; i < len  - s.length(); i++) {
-			s = "0" + s;
+		int initialLen = s.length();
+		if (initialLen != len) {
+			for (int i = 0; i < len  - initialLen; i++) {
+				s = "0" + s;
+			}
 		}
 		return s;
+	}
+	
+	/**
+	 * Write contents to the filename provided
+	 * @param filename
+	 * @return
+	 */
+	private static void writeFileContents(ArrayList<String> blocks, String filename, boolean convert) {
+		BufferedWriter writer;
+		StringBuilder contentBuilder = new StringBuilder();
+		System.out.printf("Saving contents to %s\n", filename);
+		for (String i: blocks) {
+			contentBuilder.append(i);
+		}
+		String contents = contentBuilder.toString();
+		if (convert) {
+			contents = WsuCrypt.convertHexToAscii(contents);
+		}
+		try {
+			writer = new BufferedWriter(new FileWriter(filename));
+			writer.write(contents);
+			writer.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		System.out.printf("Saving to %s completed\n", filename);
+		
 	}
  	
 	/**
@@ -59,6 +91,7 @@ public class WsuCrypt {
 	private static String readFileContents(String filename) {
 		FileInputStream fstream;
 		
+		System.out.printf("Reading %s\n", filename);
 		StringBuilder fileContents = new StringBuilder();
 		try {
 			fstream = new FileInputStream(filename);
@@ -73,81 +106,72 @@ public class WsuCrypt {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		System.out.printf("Reading %s completed.\n", filename);
 		return fileContents.toString();
 	}
 	
-	static BigInteger allOnes(int bits) {
+	private static BigInteger allOnes(int bits) {
 	    return BigInteger.ZERO.setBit(bits).subtract(BigInteger.ONE);
 	}
+	
+	private static String convertHexToAscii(String hexStr) {
+		StringBuilder output = new StringBuilder();
+	    for (int i = 0; i < hexStr.length(); i += 2) {
+	        String str = hexStr.substring(i, i + 2);
+	        output.append((char) Integer.parseInt(str, 16));
+	    }
+	     
+	    return output.toString();
+	}
+	
+	
+	private static String xor(String a, String b, int len) {
+		int hexA = Integer.parseInt(a, 16);
+		int hexB = Integer.parseInt(b, 16);
+		int hexC = hexA ^ hexB;
+		String hexNew = String.format("%h", hexC);
+		hexNew = WsuCrypt.zFill(hexNew, len);
+		return hexNew;
+	}
+	
 	
 	private static String convertAsciiToHex(String asciiText) {
 		char[] ch = asciiText.toCharArray();
 		StringBuilder hex = new StringBuilder();
 		
 		for (char c: ch) {
-			String hexCode = String.format("%H", c);
+			String hexCode = String.format("%h", c);
 			hex.append(hexCode);
 		}
 		
 		return hex.toString();
 	}
 	
-	public String leftCircularRotate(String hex, int rotateVal, int keyBits) {
+	private String leftCircularRotate(String hex, int rotateVal, int keyBits) {
 		BigInteger num = new BigInteger(hex, 16);
 		num  = num.shiftLeft(rotateVal)
 				.or(num.shiftRight(keyBits - rotateVal))
 				.and(WsuCrypt.allOnes(keyBits));
 		String hexNew = num.toString(16);
-		//hexNew = WsuCrypt.zFill(hexNew, keyBits / this.hexSize);
+		hexNew = WsuCrypt.zFill(hexNew, keyBits / this.hexSize);
 		return hexNew; 
 	}
 	
-	public String rightCircularRotate(String hex, int rotateVal, int keyBits) {
+	private String rightCircularRotate(String hex, int rotateVal, int keyBits) {
 		BigInteger num = new BigInteger(hex, 16);
 		num  = num.shiftRight(rotateVal)
 				.or(num.shiftLeft(keyBits - rotateVal))
 				.and(WsuCrypt.allOnes(keyBits));
 		String hexNew = num.toString(16);
-		//hexNew = WsuCrypt.zFill(hexNew, keyBits / this.hexSize);
+		hexNew = WsuCrypt.zFill(hexNew, keyBits / this.hexSize);
 		return hexNew; 
 	}
-	
-	public static void main(String[] args) throws Exception {
-		
-		if (args.length != 1) {
-			throw new Exception("Ensure you provide the mode to run the algorithm in.");
-		}
-		
-		WsuCrypt cryptoObj = new WsuCrypt();
-		cryptoObj.setMode(args[0]);
-		String keyContents = WsuCrypt.readFileContents(WsuCrypt.keyFile);
-		cryptoObj.setKey(keyContents);
-		
-		if (cryptoObj.mode.equals("encrypt")) {
-			String plainText = WsuCrypt.readFileContents(WsuCrypt.pTextFile);
-			String hex = WsuCrypt.convertAsciiToHex(plainText);
-			cryptoObj.getBlock(plainText);
-			cryptoObj.encrypt();
-		} else {
-			String cipherText = WsuCrypt.readFileContents(WsuCrypt.cTextFile);
-			cryptoObj.getBlock(cipherText);
-		}
-		
-	}
-	
-	private static String xor(String a, String b, int len) {
-		int hexA = Integer.parseInt(a, 16);
-		int hexB = Integer.parseInt(b, 16);
-		int hexC = hexA ^ hexB;
-		String hexNew = String.format("%H", hexC);
-		//hexNew = WsuCrypt.zFill(hexNew, len);
-		return hexNew;
-	}
-	
+
 	/*
 	 * mode attribute setter
 	 */
 	private void setMode(String mode) throws Exception {
+		System.out.printf("Mode: %s\n", mode);
 		if (!mode.equals("encrypt") && !mode.equals("decrypt")) {
 			throw new Exception("Ensure the mode is either 'encrypt' or 'decrypt'.");
 		}
@@ -224,43 +248,56 @@ public class WsuCrypt {
 					this.ftableSub(WsuCrypt.xor(g5, this.getKey(4 * round + 3), 2)), g4, 2);
 			resp = g5 + g6;
 		} else {
+			String k1 = this.getKey(4 * round + 3);
+			String k2 = this.getKey(4 * round + 2);
+			String k3 = this.getKey(4 * round + 1);
+			String k4 = this.getKey(4 * round);
 			String g3 = WsuCrypt.xor(
-					this.ftableSub(WsuCrypt.xor(g2, this.getKey(4 * round + 3), 2)), g1, 2);
+					this.ftableSub(WsuCrypt.xor(g2, k4, 2)), g1, 2);
 			String g4 = WsuCrypt.xor(
-					this.ftableSub(WsuCrypt.xor(g3, this.getKey(4 * round + 2), 2)), g2, 2);
+					this.ftableSub(WsuCrypt.xor(g3, k3, 2)), g2, 2);
 			String g5 = WsuCrypt.xor(
-					this.ftableSub(WsuCrypt.xor(g4, this.getKey(4 * round + 1), 2)), g3, 2);
+					this.ftableSub(WsuCrypt.xor(g4, k2, 2)), g3, 2);
 			String g6 = WsuCrypt.xor(
-					this.ftableSub(WsuCrypt.xor(g5, this.getKey(4 * round), 2)), g4, 2);
+					this.ftableSub(WsuCrypt.xor(g5, k1, 2)), g4, 2);
 			resp = g5 + g6;
 		}
+		
 		return resp;
 	}
 	
 	private ArrayList<String> F(String R0, String R1, int round) {
 		ArrayList<String> resp = new ArrayList<String>();
-		String T0 = G(R0, round);
-		String T1 = G(R1, round);
-		int t0Int = Integer.parseInt(T0, 16);
-		int t1Int = Integer.parseInt(T1, 16);
 		if (this.mode.equals("encrypt")) {
+			String T0 = G(R0, round);
+			String T1 = G(R1, round);
+			int t0Int = Integer.parseInt(T0, 16);
+			int t1Int = Integer.parseInt(T1, 16);
 			String key1 = this.getKey(4 * round) + this.getKey(4 * round + 1);
 			String key2 = this.getKey(4 * round + 2) + this.getKey(4 * round + 3);
 			int k1Int = Integer.parseInt(key1, 16);
 			int k2Int = Integer.parseInt(key2, 16);
 			int F0 = (t0Int + (2 * t1Int) + k1Int) % 65536;
 			int F1 = ((2 *t0Int) + t1Int + k2Int) % 65536;
-			resp.add(String.format("%H", F0));
-			resp.add(String.format("%H", F1));
+			resp.add(String.format("%h", F0));
+			resp.add(String.format("%h", F1));
 		} else {
-			String key1 = this.getKey(4 * round + 3) + this.getKey(4 * round + 2);
-			String key2 = this.getKey(4 * round + 1) + this.getKey(4 * round);
+			String k1 = this.getKey(4 * round + 3);
+			String k2 = this.getKey(4 * round + 2);
+			String k3 = this.getKey(4 * round + 1);
+			String k4 = this.getKey(4 * round);
+			String key1 = k4 + k3;
+			String key2 = k2 + k1;	
+			String T1 = G(R1, round);
+			String T0 = G(R0, round);
+			int t0Int = Integer.parseInt(T0, 16);
+			int t1Int = Integer.parseInt(T1, 16);
 			int k1Int = Integer.parseInt(key1, 16);
 			int k2Int = Integer.parseInt(key2, 16);
 			int F0 = (t0Int + (2 * t1Int) + k1Int) % 65536;
 			int F1 = ((2 *t0Int) + t1Int + k2Int) % 65536;
-			resp.add(String.format("%H", F0));
-			resp.add(String.format("%H", F1));
+			resp.add(String.format("%h", F0));
+			resp.add(String.format("%h", F1));
 		}
 		
 		return resp;
@@ -286,17 +323,18 @@ public class WsuCrypt {
 	 */
 	private String getKey(int round) {
 		String subKey;
-		int startIdx = round % (key.length() / 2);
+		int startIdx = round % 8;//(this.originalKey.length() / 2);
 		startIdx = startIdx * 2;
 		int endIdx = startIdx + 2;
 		if (this.mode.equals("encrypt")) {
-			this.key = this.leftCircularRotate(this.key, 1, this.originalKey.length());
+			this.key = this.leftCircularRotate(
+				this.key, 1, this.originalKey.length() * this.hexSize);
 			subKey = this.key.substring(startIdx, endIdx);
 		} else {
 			subKey = this.key.substring(startIdx, endIdx);
-			this.key = this.rightCircularRotate(this.key, 1, this.originalKey.length());
+			this.key = this.rightCircularRotate(
+				this.key, 1, this.originalKey.length() * this.hexSize);
 		}
-		System.out.println(subKey);
 		return subKey;
 	}
 	
@@ -305,6 +343,7 @@ public class WsuCrypt {
 	 */
 	private void encrypt() {
 		String R0, R1, R2, R3, F0, F1;
+		System.out.println("Encrypting.... Please wait");
 		int totalRounds = this.originalKey.length();
 		
 		for (int i = 0; i < this.blocks.size(); i++) {
@@ -314,17 +353,18 @@ public class WsuCrypt {
 			R1 = whitened.get(1);
 			R2 = whitened.get(2);
 			R3 = whitened.get(3);
-			for (int j = 0; j < totalRounds - 1; j++) {
+			for (int j = 0; j < totalRounds; j++) {
 				ArrayList<String> afterF = F(R0, R1, j);
+				String tempR0 = R0;
+				String tempR1 = R1;
 				F0 = afterF.get(0);
 				F1 = afterF.get(1);
 				R0 = WsuCrypt.xor(R2, F0, 4);
 				R0 = this.rightCircularRotate(R0, 1, 16);
 				R3 = this.leftCircularRotate(R3, 1, 16);
 				R1 = WsuCrypt.xor(R3, F1, 4);
-				R2 = R0;
-				R3 = R1;
-				System.out.printf("%s %s\n", F0, F1);
+				R2 = tempR0;
+				R3 = tempR1;
 			}
 			String y = R2 + R3 + R0 + R1;
 			whitened = this.inputWhitening(
@@ -335,5 +375,71 @@ public class WsuCrypt {
 			R3 = whitened.get(3);
 			this.blocks.set(i, R0 + R1 + R2 + R3);
 		}
+		System.out.println("Encryption Complete.");
+	}
+	
+	/**
+	 * Performs decryption.
+	 */
+	private void decrypt() {
+		String R0, R1, R2, R3, F0, F1;
+		System.out.println("Decrypting.... Please wait");
+		int totalRounds = this.originalKey.length();
+		for (int i = 0; i < this.blocks.size(); i++) {
+			ArrayList<String> whitened = this.inputWhitening(
+					this.blocks.get(i), this.originalKey);
+			R0 = whitened.get(0);
+			R1 = whitened.get(1);
+			R2 = whitened.get(2);
+			R3 = whitened.get(3);
+			for (int j = 1; j < totalRounds + 1; j++) {
+				ArrayList<String> afterF = F(R0, R1, j);
+				String tempR0 = R0;
+				String tempR1 = R1;
+				F0 = afterF.get(0);
+				F1 = afterF.get(1);
+				R2 = this.leftCircularRotate(R2, 1, 16);
+				R0 = WsuCrypt.xor(R2, F0, 4);
+				R1 = WsuCrypt.xor(R3, F1, 4);
+				R1 = this.rightCircularRotate(R1, 1, 16);
+				R2 = tempR0;
+				R3 = tempR1;
+			}
+			String y = R2 + R3 + R0 + R1;
+			whitened = this.inputWhitening(
+					y, this.originalKey);
+			R0 = whitened.get(0);
+			R1 = whitened.get(1);
+			R2 = whitened.get(2);
+			R3 = whitened.get(3);
+			this.blocks.set(i, R0 + R1 + R2 + R3);
+		}
+		System.out.println("Decryption Complete.");
+	}
+	
+	public static void main(String[] args) throws Exception {
+		
+		if (args.length != 1) {
+			throw new Exception("Ensure you provide the mode to run the algorithm in.");
+		}
+		
+		WsuCrypt cryptoObj = new WsuCrypt();
+		cryptoObj.setMode(args[0]);
+		String keyContents = WsuCrypt.readFileContents(WsuCrypt.keyFile);
+		cryptoObj.setKey(keyContents);
+		
+		if (cryptoObj.mode.equals("encrypt")) {
+			String plainText = WsuCrypt.readFileContents(WsuCrypt.pTextFile);
+			String hex = WsuCrypt.convertAsciiToHex(plainText);
+			cryptoObj.getBlock(hex);
+			cryptoObj.encrypt();
+			WsuCrypt.writeFileContents(cryptoObj.blocks, WsuCrypt.cTextFile, false);
+		} else {
+			String cipherText = WsuCrypt.readFileContents(WsuCrypt.cTextFile);
+			cryptoObj.getBlock(cipherText);
+			cryptoObj.decrypt();
+			WsuCrypt.writeFileContents(cryptoObj.blocks, WsuCrypt.pTextFile, false);
+		}
+		
 	}
 }
